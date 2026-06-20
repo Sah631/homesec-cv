@@ -220,3 +220,4 @@ __marimo__/
 __pycache__
 checkpoints/*
 .vscode/*
+data/*

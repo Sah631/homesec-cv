@@ -29,3 +29,32 @@ DETECTION_CLASSES = [
     15, # cat
     16, # dog
 ]
+
+SAVE_COOLDOWN = 1 # seconds between saving images of the same class from the same camera
+
+# Ignore zones use the same pixel coordinates as the frames passed to YOLO.
+# Current read_video.py frame size is 1280x720, and each box is [x1, y1, x2, y2].
+IGNORE_ZONES = {
+    "cam1": [
+        {
+            "name": "parked_upper_driveway_car",
+            "bbox": [110, 85, 845, 390],
+            "class_ids": [2],  # car
+        },
+        {
+            "name": "parked_lower_driveway_car",
+            "bbox": [320, 225, 1120, 720],
+            "class_ids": [2],  # car
+        },
+        {
+            "name": "parked_opposite_road_left_car",
+            "bbox": [670, 0, 780, 30],
+            "class_ids": [2],  # car
+        },
+        {
+            "name": "parked_opposite_road_cars",
+            "bbox": [1030, 0, 1180, 75],
+            "class_ids": [2],  # car
+        },
+    ],
+}

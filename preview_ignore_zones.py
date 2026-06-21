@@ -48,9 +48,17 @@ def draw_ignore_zones(image, camera_name):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Preview configured ignore zones on a saved frame.")
-    parser.add_argument("--camera", default="cam1", help="Camera name from config.py, e.g. cam1")
-    parser.add_argument("--image", type=Path, help="Image path to preview. Defaults to latest camera image.")
+    parser = argparse.ArgumentParser(
+        description="Preview configured ignore zones on a saved frame."
+    )
+    parser.add_argument(
+        "--camera", default="cam1", help="Camera name from config.py, e.g. cam1"
+    )
+    parser.add_argument(
+        "--image",
+        type=Path,
+        help="Image path to preview. Defaults to latest camera image.",
+    )
     return parser.parse_args()
 
 

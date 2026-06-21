@@ -59,7 +59,10 @@ def is_detection_ignored(camera_name, detection):
     for ignore_zone in IGNORE_ZONES.get(camera_name, []):
         ignored_class_ids = ignore_zone.get("class_ids")
 
-        if ignored_class_ids is not None and detection["class_id"] not in ignored_class_ids:
+        if (
+            ignored_class_ids is not None
+            and detection["class_id"] not in ignored_class_ids
+        ):
             continue
 
         if center_inside(detection["bbox"], ignore_zone["bbox"]):
@@ -141,7 +144,14 @@ while True:
     now = time.time()
 
     if now - last_inference_time > 0.2:
-        latest_results = model.predict(frames, save=False, conf=0.25, iou=0.45, imgsz=640, classes=DETECTION_CLASSES)
+        latest_results = model.predict(
+            frames,
+            save=False,
+            conf=0.25,
+            iou=0.45,
+            imgsz=640,
+            classes=DETECTION_CLASSES,
+        )
         last_inference_time = now
 
         for camera_index, result in enumerate(latest_results):
@@ -153,8 +163,13 @@ while True:
                 if not is_detection_ignored(camera_name, detection)
             ]
 
-            if interesting_detections and now - last_save_time[camera_index] > SAVE_COOLDOWN:
-                image_path = save_detection_frame(camera_name, clean_frames[camera_index], interesting_detections)
+            if (
+                interesting_detections
+                and now - last_save_time[camera_index] > SAVE_COOLDOWN
+            ):
+                image_path = save_detection_frame(
+                    camera_name, clean_frames[camera_index], interesting_detections
+                )
 
                 if image_path is not None:
                     last_save_time[camera_index] = now
@@ -169,16 +184,23 @@ while True:
             cls = int(box.cls[0])
             label = f"{model.names[cls]} {conf:.2f}"
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-
+            cv2.putText(
+                frame,
+                label,
+                (x1, y1 - 10),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (0, 255, 0),
+                2,
+            )
 
     top_row = np.hstack([frame1, frame2])
     bottom_row = np.hstack([frame3, frame4])
     grid = np.vstack([top_row, bottom_row])
 
-    cv2.imshow('Camera Grid', grid)
+    cv2.imshow("Camera Grid", grid)
 
-    if cv2.waitKey(1) & 0xFF == ord('q'):
+    if cv2.waitKey(1) & 0xFF == ord("q"):
         break
 
 cap1.release()

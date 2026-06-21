@@ -25,12 +25,14 @@ DETECTION_CLASSES = [
     3,  # motorcycle
     5,  # bus
     7,  # truck
-    14, # bird
-    15, # cat
-    16, # dog
+    14,  # bird
+    15,  # cat
+    16,  # dog
 ]
 
-SAVE_COOLDOWN = 1 # seconds between saving images of the same class from the same camera
+SAVE_COOLDOWN = (
+    1  # seconds between saving images of the same class from the same camera
+)
 
 # Ignore zones use the same pixel coordinates as the frames passed to YOLO.
 # Current read_video.py frame size is 1280x720, and each box is [x1, y1, x2, y2].

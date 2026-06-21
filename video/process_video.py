@@ -1,3 +1,5 @@
+from typing import Optional
+
 import cv2
 from config import CAMERA_URLS, DETECTION_CLASSES
 import time
@@ -14,13 +16,18 @@ def open_video_streams() -> dict[str, cv2.VideoCapture]:
         if not cap.isOpened():
             raise RuntimeError(f"Could not open RTSP stream for {camera_name}")
         caps[camera_name] = cap
-    
+
     return caps
 
-def resize_frames(frames: list, target_dims: tuple = (1280, 720)) -> list:
-    return [cv2.resize(frame, target_dims, interpolation=cv2.INTER_LINEAR) for frame in frames]
 
-def process_videos(model: YOLO) -> None:
+def resize_frames(frames: list, target_dims: tuple = (1280, 720)) -> list:
+    return [
+        cv2.resize(frame, target_dims, interpolation=cv2.INTER_LINEAR)
+        for frame in frames
+    ]
+
+
+def process_videos(model: YOLO, fps: Optional[float] = 20.0) -> None:
     # Video processing loop
     caps = open_video_streams()
     last_inference_time = 0
@@ -34,14 +41,19 @@ def process_videos(model: YOLO) -> None:
         if not ret1 or not ret2 or not ret3 or not ret4:
             print("Failed to grab frame")
             break
-        
+
         uniform_dims = (1280, 720)
 
         frames = resize_frames([frame1, frame2, frame3, frame4], uniform_dims)
 
         now = time.time()
 
-        if now - last_inference_time > 0.05:
+        inference_interval = (
+            1.0 / fps if fps else 0.2
+        )  # Default to 5 FPS if no FPS specified
+
+        # TODO: Add dynamic fps control to adjust inference frequency based on processing load and frame rate of incoming video streams
+        if now - last_inference_time > inference_interval:
             latest_results = model.predict(
                 frames,
                 save=False,
@@ -63,19 +75,26 @@ def process_videos(model: YOLO) -> None:
                 cls = int(box.cls[0])
                 label = f"{model.names[cls]} {conf:.2f}"
                 cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                cv2.putText(
+                    frame,
+                    label,
+                    (x1, y1 - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5,
+                    (0, 255, 0),
+                    2,
+                )
 
-
-        top_row = np.hstack([frame1, frame2])
-        bottom_row = np.hstack([frame3, frame4])
+        top_row = np.hstack([frames[0], frames[1]])
+        bottom_row = np.hstack([frames[2], frames[3]])
         grid = np.vstack([top_row, bottom_row])
 
-        cv2.imshow('Camera Grid', grid)
+        cv2.imshow("Camera Grid", grid)
 
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if cv2.waitKey(1) & 0xFF == ord("q"):
             break
 
     for cap in caps.values():
         cap.release()
-        
+
     cv2.destroyAllWindows()

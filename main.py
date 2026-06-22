@@ -1,9 +1,13 @@
 # Entrypoint for app
 # Should initialise model and start video processing loop
 import argparse
+import logging
 
 from models.yolo26 import model
 from video import process_videos
+
+
+logger = logging.getLogger(__name__)
 
 
 def parse_args() -> argparse.Namespace:
@@ -48,11 +52,26 @@ def parse_args() -> argparse.Namespace:
         help="Whether to save raw frames or annotated frames with detections (default: annotated)",
     )
 
+    parser.add_argument(
+        "--log-level",
+        choices=["DEBUG", "INFO"],
+        default="INFO",
+        help="Logging verbosity level (default: INFO)",
+    )
+
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
+
+    logging.basicConfig(
+        level=args.log_level,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+    logger.info("Starting HomeSec CV App")
 
     yolo_model = model
     process_videos(

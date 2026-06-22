@@ -53,7 +53,7 @@ def draw_frame(result, frame):
     annotated_frame = frame.copy()
 
     if result is None:
-        return
+        return annotated_frame
 
     for box in result.boxes:
         x1, y1, x2, y2 = map(int, box.xyxy[0])

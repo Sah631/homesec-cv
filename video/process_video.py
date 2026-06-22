@@ -19,6 +19,10 @@ import numpy as np
 from ultralytics import YOLO
 from video.frame_buffer import FrameBuffer
 from utils.video import extract_detections, is_detection_ignored, draw_frame
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -43,7 +47,6 @@ class ClipManager:
         self.cooldown_seconds = cooldown_seconds
         self.post_roll_seconds = post_roll_seconds
         self.last_clip_end_times: dict[str, float] = {}
-        pass
 
     def process_frame(
         self, camera: str, frame, frame_buffer: FrameBuffer, detections: list | None
@@ -71,8 +74,8 @@ class ClipManager:
 
         try:
             event.writer.write(frame)  # Write frame to video if clip is active
-        except Exception as e:
-            print(f"[ERROR] Failed to write frame for camera {camera}: {e}")
+        except Exception:
+            logger.exception("Failed to write frame for camera %s", camera)
 
         if now - event.last_detection_time > self.post_roll_seconds:
             self._end_clip(camera)  # Finalise and save clip, remove from active_clips
@@ -96,18 +99,16 @@ class ClipManager:
         writer = cv2.VideoWriter(clip_path, fourcc, CLIP_OUTPUT_FPS, (1280, 720))
 
         if not writer.isOpened():
-            print(
-                f"[ERROR] Failed to open VideoWriter for camera {camera} at path {clip_path}"
+            logger.error(
+                "Failed to open VideoWriter for camera %s at path %s", camera, clip_path
             )
             return
 
         for _, frame in pre_roll_entries:
             try:
                 writer.write(frame)  # Write pre-roll frames to clip
-            except Exception as e:
-                print(
-                    f"[ERROR] Failed to write pre-roll frame for camera {camera}: {e}"
-                )
+            except Exception:
+                logger.exception("Failed to write pre-roll frame for camera %s", camera)
 
         clip_event = ClipEvent(
             camera=camera,
@@ -135,15 +136,17 @@ class ClipManager:
 
                 self._save_clip_metadata(clip_path, detections, start_time, end_time)
 
-                print(
-                    f"[LOG] Clip saved to {clip_path} with {len(detections)} trigger detections"
+                logger.info(
+                    "Clip saved to %s with %d trigger detections",
+                    clip_path,
+                    len(detections),
                 )
                 return
-            except Exception as e:
-                print(f"[ERROR] Failed to save clip for camera {camera}: {e}")
+            except Exception:
+                logger.exception("Failed to save clip for camera %s", camera)
                 return
 
-        print(f"[LOG] No active clip to end for camera {camera}")
+        logger.info("No active clip to end for camera %s", camera)
 
     def _save_clip_metadata(
         self,
@@ -169,8 +172,8 @@ class ClipManager:
             with open(CLIP_METADATA_PATH, "a") as f:
                 json.dump(metadata_entry, f)
                 f.write("\n")
-        except Exception as e:
-            print(f"[ERROR] Failed to save clip metadata for {clip_path}: {e}")
+        except Exception:
+            logger.exception("Failed to save clip metadata for %s", clip_path)
 
     def _cooldown_over(self, camera: str, now: float) -> bool:
         """Check if cooldown period has passed since last clip for this camera"""
@@ -205,7 +208,9 @@ def open_video_streams() -> dict[str, cv2.VideoCapture]:
         # TODO: Implement retry logic with backoff to make program more robust to temporary network issues or NVR restarts
         if not cap.isOpened():
             raise RuntimeError(f"Could not open RTSP stream for {camera_name}")
+
         caps[camera_name] = cap
+        logger.debug("Opened stream for %s", camera_name)
 
     return caps
 
@@ -226,6 +231,14 @@ def process_videos(
     clip_output_mode: str = "annotated",
 ) -> None:
     # Video processing loop
+    logger.debug(
+        "Video processing config: fps=%.1f, pre_roll_seconds=%.1f, post_roll_seconds=%.1f, save_clips=%s, clip_output_mode=%s",
+        fps,
+        pre_roll_seconds,
+        post_roll_seconds,
+        save_clips,
+        clip_output_mode,
+    )
 
     caps = open_video_streams()
     last_inference_time = 0
@@ -233,6 +246,9 @@ def process_videos(
     frame_buffers = init_frame_buffers(pre_roll_seconds=pre_roll_seconds)
     clip_manager = ClipManager(post_roll_seconds=post_roll_seconds)
 
+    latest_results = [None, None, None, None]
+
+    # Could probably split this whole block into separate threads for each camera
     while True:
         ret1, frame1 = caps["cam1"].read()
         ret2, frame2 = caps["cam2"].read()
@@ -240,7 +256,7 @@ def process_videos(
         ret4, frame4 = caps["cam4"].read()
 
         if not ret1 or not ret2 or not ret3 or not ret4:
-            print("Failed to grab frame")
+            logger.error("Failed to grab frame")
             break
 
         uniform_dims = (1280, 720)
@@ -284,6 +300,14 @@ def process_videos(
                     if not is_detection_ignored(camera_name, detection)
                 ]
 
+                logger.debug(
+                    "Camera %s detections: total=%d interesting=%d ignored=%d",
+                    camera_name,
+                    len(detections),
+                    len(interesting_detections),
+                    len(detections) - len(interesting_detections),
+                )
+
                 # Only run clip manager if save clips is enabled
                 if save_clips:
                     clip_manager.process_frame(
@@ -297,26 +321,10 @@ def process_videos(
 
                 # Update frames with annotated versions for display
                 frames[camera_idx] = annotated_frame
-
-        """for result, frame in zip(latest_results, frames):
-            if result is None:
-                continue
-
-            for box in result.boxes:
-                x1, y1, x2, y2 = map(int, box.xyxy[0])
-                conf = box.conf[0]
-                cls = int(box.cls[0])
-                label = f"{CLASS_NAMES.get(cls, f'Unknown_{cls}')} {conf:.2f}"
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                cv2.putText(
-                    frame,
-                    label,
-                    (x1, y1 - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5,
-                    (0, 255, 0),
-                    2,
-                )"""
+        else:
+            # Draw old annotations to avoid flickering if camera FPS is higher than inference FPS
+            for camera_idx, result in enumerate(latest_results):
+                frames[camera_idx] = draw_frame(result, frames[camera_idx])
 
         top_row = np.hstack([frames[0], frames[1]])
         bottom_row = np.hstack([frames[2], frames[3]])
@@ -325,9 +333,14 @@ def process_videos(
         cv2.imshow("Camera Grid", grid)
 
         if cv2.waitKey(1) & 0xFF == ord("q"):
+            logger.info("Shutdown requested by user")
             break
 
+    logger.debug("Releasing video captures")
     for cap in caps.values():
         cap.release()
 
+    logger.debug("Destroying OpenCV windows")
     cv2.destroyAllWindows()
+
+    logger.info("Video processing stopped")

@@ -19,6 +19,35 @@ def parse_args() -> argparse.Namespace:
         default=20.0,
         help="Frames per second for processing video streams (default: 20.0)",
     )
+
+    parser.add_argument(
+        "--pre-roll-seconds",
+        type=float,
+        default=15.0,
+        help="Seconds of pre-roll to include in each clip (default: 15.0)",
+    )
+
+    parser.add_argument(
+        "--post-roll-seconds",
+        type=float,
+        default=15.0,
+        help="Seconds of post-roll to include in each clip (default: 15.0)",
+    )
+
+    parser.add_argument(
+        "--save-clips",
+        action="store_true",
+        default=False,
+        help="Whether to save clips to disk (default: False, set to True to enable)",
+    )
+
+    parser.add_argument(
+        "--clip-output-mode",
+        choices=["annotated", "raw"],
+        default="annotated",
+        help="Whether to save raw frames or annotated frames with detections (default: annotated)",
+    )
+
     return parser.parse_args()
 
 
@@ -26,7 +55,14 @@ def main():
     args = parse_args()
 
     yolo_model = model
-    process_videos(yolo_model, fps=args.fps)
+    process_videos(
+        yolo_model,
+        fps=args.fps,
+        pre_roll_seconds=args.pre_roll_seconds,
+        post_roll_seconds=args.post_roll_seconds,
+        save_clips=args.save_clips,
+        clip_output_mode=args.clip_output_mode,
+    )
 
 
 if __name__ == "__main__":

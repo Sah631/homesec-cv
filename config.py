@@ -1,5 +1,7 @@
-from dotenv import load_dotenv
 import os
+from pathlib import Path
+
+from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -30,9 +32,31 @@ DETECTION_CLASSES = [
     16,  # dog
 ]
 
+CLASS_NAMES = {
+    0: "person",
+    1: "bicycle",
+    2: "car",
+    3: "motorcycle",
+    5: "bus",
+    7: "truck",
+    14: "bird",
+    15: "cat",
+    16: "dog",
+}
+
 SAVE_COOLDOWN = (
     1  # seconds between saving images of the same class from the same camera
 )
+
+SAVE_CLIPS_ENABLED = True
+CLIP_PRE_ROLL_SECONDS = 15
+CLIP_POST_ROLL_SECONDS = 15
+CLIP_COOLDOWN_SECONDS = 5
+CLIP_OUTPUT_FPS = 20.0
+CLIP_OUTPUT_MODE = "annotated"
+CLIP_LOCATION_MODE = "outside_ignore_zones"
+CLIP_OUTPUT_DIR = Path("data/clips")
+CLIP_METADATA_PATH = Path("data/metadata/clips.jsonl")
 
 # Ignore zones use the same pixel coordinates as the frames passed to YOLO.
 # Current read_video.py frame size is 1280x720, and each box is [x1, y1, x2, y2].

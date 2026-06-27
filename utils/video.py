@@ -1,5 +1,6 @@
-from config import IGNORE_ZONES, CLASS_NAMES
 import cv2
+
+from config import CLASS_NAMES, IGNORE_ZONES
 
 
 def extract_detections(result) -> list[dict]:

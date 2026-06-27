@@ -6,7 +6,6 @@ from pathlib import Path
 
 import numpy as np
 
-
 os.environ.setdefault("HV_USER", "user")
 os.environ.setdefault("HV_PW", "password")
 os.environ.setdefault("NVR_IP", "127.0.0.1")
@@ -14,9 +13,9 @@ os.environ.setdefault("PORT", "554")
 
 from video.frame_buffer import FrameBuffer
 from video.process_video import (
-    ClipEventManager,
     LOCATION_MODE_OUTSIDE_IGNORE_ZONES,
     LOCATION_MODE_WHOLE_FRAME,
+    ClipEventManager,
     center_inside,
     filter_interesting_detections,
 )

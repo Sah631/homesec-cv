@@ -1,5 +1,6 @@
-from collections import deque
 import time
+from collections import deque
+
 from config import CLIP_PRE_ROLL_SECONDS
 
 

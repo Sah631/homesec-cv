@@ -8,7 +8,6 @@ import cv2
 
 from config import IGNORE_ZONES
 
-
 RAW_DATA_DIR = Path("data") / "raw"
 
 

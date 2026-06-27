@@ -3,9 +3,9 @@
 import argparse
 import logging
 
-from models.yolo26 import model
+from detectors.yolo26 import model
 from video import process_videos
-
+from workers.main_worker import main_worker
 
 logger = logging.getLogger(__name__)
 
@@ -85,4 +85,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+
+    main_worker()

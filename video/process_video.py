@@ -1,26 +1,26 @@
 import json
+import logging
+import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
-from dataclasses import dataclass
 
 import cv2
-from config import (
-    CAMERA_URLS,
-    CLIP_OUTPUT_MODE,
-    DETECTION_CLASSES,
-    CLIP_COOLDOWN_SECONDS,
-    CLIP_POST_ROLL_SECONDS,
-    CLIP_OUTPUT_DIR,
-    CLIP_OUTPUT_FPS,
-    CLIP_METADATA_PATH,
-)
-import time
 import numpy as np
 from ultralytics import YOLO
-from video.frame_buffer import FrameBuffer
-from utils.video import extract_detections, is_detection_ignored, draw_frame
-import logging
 
+from config import (
+    CAMERA_URLS,
+    CLIP_COOLDOWN_SECONDS,
+    CLIP_METADATA_PATH,
+    CLIP_OUTPUT_DIR,
+    CLIP_OUTPUT_FPS,
+    CLIP_OUTPUT_MODE,
+    CLIP_POST_ROLL_SECONDS,
+    DETECTION_CLASSES,
+)
+from utils.video import draw_frame, extract_detections, is_detection_ignored
+from video.frame_buffer import FrameBuffer
 
 logger = logging.getLogger(__name__)
 

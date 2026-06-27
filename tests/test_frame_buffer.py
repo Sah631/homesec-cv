@@ -1,7 +1,6 @@
 import os
 import unittest
 
-
 os.environ.setdefault("HV_USER", "user")
 os.environ.setdefault("HV_PW", "password")
 os.environ.setdefault("NVR_IP", "127.0.0.1")

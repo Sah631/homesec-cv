@@ -84,3 +84,5 @@ IGNORE_ZONES = {
         },
     ],
 }
+
+DEFAULT_DIMENSIONS = (1280, 720)

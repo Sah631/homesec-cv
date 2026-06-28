@@ -85,13 +85,13 @@ def main_worker():
                     logger.warning("Thread %s exited.", thread.name)
                     stop_event.set()
                     break
-            
+
             stop_event.wait(1.0)
 
     except KeyboardInterrupt:
         logger.info("KeyboardInterrupt received. Requesting shutdown.")
         stop_event.set()
-    
+
     except Exception:
         logger.exception("Main worker crashed. Requesting shutdown.")
         stop_event.set()

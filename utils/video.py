@@ -74,3 +74,25 @@ def draw_frame(result, frame):
         )
 
     return annotated_frame
+
+
+# TODO: Make this function cleaner and integrate with annotate_frame in display.py
+def draw_ignore_zones(image, camera_name):
+    output = image.copy()
+
+    for ignore_zone in IGNORE_ZONES.get(camera_name, []):
+        x1, y1, x2, y2 = ignore_zone["bbox"]
+        label = ignore_zone.get("name", "ignore_zone")
+
+        cv2.rectangle(output, (x1, y1), (x2, y2), (0, 165, 255), 2)
+        cv2.putText(
+            output,
+            label,
+            (x1, max(20, y1 - 8)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            (0, 165, 255),
+            2,
+        )
+
+    return output

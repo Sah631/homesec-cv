@@ -70,7 +70,10 @@ def inference_worker(
             logger.exception("Inference failed")
 
             if failure_count >= 5:
-                logger.error("Inference failed %d consecutive times. Requesting shutdown.", failure_count)
+                logger.error(
+                    "Inference failed %d consecutive times. Requesting shutdown.",
+                    failure_count,
+                )
                 stop_event.set()
                 break
 

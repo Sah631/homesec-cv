@@ -5,7 +5,6 @@ from queue import Empty
 import cv2
 import numpy as np
 
-from config import CAMERA_URLS
 from utils.display import annotate_frame
 from utils.queues import SlidingQueue
 
@@ -15,16 +14,25 @@ logger = logging.getLogger(__name__)
 def display_worker(
     display_queues: dict[str, SlidingQueue],
     stop_event: threading.Event,
+    camera_names: list[str],
     annotated: bool = True,
+    display_sleep_seconds: float = 0.01,
 ):
-    latest_frames: dict[str, np.ndarray | None] = {}
+    """
+    Consume detection packets and render the latest frame from each camera.
 
-    for camera_name in CAMERA_URLS.keys():
-        latest_frames[camera_name] = None
+    Optionally draws detection annotations, displays the camera grid, and
+    requests shutdown when the user closes the display with the quit key.
+    """
+    logger.info("Display worker started.")
+
+    latest_frames: dict[str, np.ndarray | None] = {
+        camera_name: None for camera_name in camera_names
+    }
 
     try:
         while not stop_event.is_set():
-            for camera_name, _ in CAMERA_URLS.items():
+            for camera_name in camera_names:
                 try:
                     detection_packet = display_queues[camera_name].get_nowait()
                 except Empty:
@@ -37,10 +45,11 @@ def display_worker(
                 else:
                     latest_frames[camera_name] = detection_packet.frame
 
-            if not all(latest_frames[name] is not None for name in CAMERA_URLS.keys()):
-                stop_event.wait(0.01)
+            if not all(latest_frames[name] is not None for name in camera_names):
+                stop_event.wait(display_sleep_seconds)
                 continue
 
+            # Add a util function to dynamically create grid instead of hardcoding
             top_row = np.hstack([latest_frames["cam1"], latest_frames["cam2"]])
             bottom_row = np.hstack([latest_frames["cam3"], latest_frames["cam4"]])
             grid = np.vstack([top_row, bottom_row])
@@ -50,9 +59,11 @@ def display_worker(
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 logger.info("Shutdown requested by user. Shutting down display thread.")
                 stop_event.set()
+                break
+
+            stop_event.wait(display_sleep_seconds)
 
     except Exception:
-        # TODO: Implement retry/restart logic for the thread in case it crashes
         logger.exception("Display worker crashed.")
         stop_event.set()
 

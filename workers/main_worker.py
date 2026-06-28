@@ -10,10 +10,13 @@ from workers import camera_worker, display_worker, inference_worker
 logger = logging.getLogger(__name__)
 
 
+# TODO: Pass in arguments from main (like annotated display, detector, etc.)
 def main_worker():
     """
-    Main orchestrator thread responsible for creating all background threads, owning queues for passing data
-    between threads, and exiting the program cleanly.
+    Start and supervise the camera, inference, and display workers.
+
+    Creates the shared queues and shutdown event, launches all worker threads,
+    watches for unexpected worker exits, and joins threads during shutdown.
     """
     frame_queues: dict[str, SlidingQueue] = {}
     # detection_queue = SlidingQueue(maxsize=10)
@@ -21,6 +24,7 @@ def main_worker():
     camera_threads: dict[str, Thread] = {}
     stop_event = Event()
     detector = YOLODetector(model_name="YOLO26")
+    camera_names = list(CAMERA_URLS.keys())
 
     for camera_name, camera_url in CAMERA_URLS.items():
         frame_queues[camera_name] = SlidingQueue(
@@ -29,7 +33,6 @@ def main_worker():
 
         display_queues[camera_name] = SlidingQueue(maxsize=1)
 
-        # Need to pass specific camera queue as parameter to this worker
         camera_threads[camera_name] = Thread(
             target=camera_worker,
             name=f"CameraWorker-{camera_name}",
@@ -43,11 +46,10 @@ def main_worker():
             },
         )
 
-    # Pass all frame_queues as parameter to this worker
     inference_thread = Thread(
         target=inference_worker,
         name="InferenceWorker",
-        kwargs={  # Once inference_worker is created, ensure the kwargs match
+        kwargs={
             "detector": detector,
             "frame_queues": frame_queues,
             "display_queues": display_queues,
@@ -55,13 +57,13 @@ def main_worker():
         },
     )
 
-    # Pass display_queues as parameter to this worker
     display_thread = Thread(
         target=display_worker,
         name="DisplayWorker",
-        kwargs={  # Once display_worker is created, ensure the kwargs match
+        kwargs={
             "display_queues": display_queues,
             "stop_event": stop_event,
+            "camera_names": camera_names,
         },
     )
 
@@ -77,19 +79,30 @@ def main_worker():
         for thread in all_threads:
             thread.start()
 
-        for thread in all_threads:
-            thread.join()
+        while not stop_event.is_set():
+            for thread in all_threads:
+                if not thread.is_alive():
+                    logger.warning("Thread %s exited.", thread.name)
+                    stop_event.set()
+                    break
+            
+            stop_event.wait(1.0)
 
     except KeyboardInterrupt:
         logger.info("KeyboardInterrupt received. Requesting shutdown.")
+        stop_event.set()
+    
+    except Exception:
+        logger.exception("Main worker crashed. Requesting shutdown.")
+        stop_event.set()
+
+    finally:
         stop_event.set()
 
         for thread in all_threads:
             logger.info("Waiting for thread %s to stop.", thread.name)
             thread.join(timeout=5.0)
 
-    finally:
-        stop_event.set()
         logger.info(
             "All worker threads stopped or shutdown requested. Exiting program."
         )

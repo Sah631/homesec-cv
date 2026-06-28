@@ -13,7 +13,18 @@ from utils.queues import SlidingQueue
 logger = logging.getLogger(__name__)
 
 
-# TODO: Implement automatic reconnection to camera if error is encountered
+def _open_capture(camera_name: str, camera_url: str) -> cv2.VideoCapture | None:
+    cap = cv2.VideoCapture(camera_url, cv2.CAP_FFMPEG)
+
+    if not cap.isOpened():
+        logger.warning("Could not open RTSP stream for %s", camera_name)
+        cap.release()
+        return None
+
+    logger.info("Opened stream for %s", camera_name)
+    return cap
+
+
 def camera_worker(
     camera_name: str,
     camera_url: str,
@@ -21,50 +32,84 @@ def camera_worker(
     frame_queue: SlidingQueue,
     inference_fps: float = CLIP_OUTPUT_FPS,
     dims: tuple[int, int] = DEFAULT_DIMENSIONS,
+    initial_reconnect_delay: float = 1.0,
+    max_reconnect_delay: float = 30.0,
 ):
-    cap = cv2.VideoCapture(camera_url, cv2.CAP_FFMPEG)
+    """
+    Capture frames from one camera stream and publish sampled frames for inference.
 
-    # TODO: Implement retry logic with backoff to make program more robust to temporary network issues or NVR restarts
-    if not cap.isOpened():
-        logger.error("Could not open RTSP stream for %s", camera_name)
-        return
+    Reconnects with backoff when the stream cannot be opened or frame capture
+    fails, and exits when shutdown is requested through stop_event.
+    """
+    logger.info("Camera worker started for %s", camera_name)
 
-    logger.debug("Opened stream for %s", camera_name)
+    if inference_fps <= 0:
+        raise ValueError("inference_fps must be > 0")
 
     # frame_buffer = FrameBuffer(pre_roll_seconds=pre_roll_seconds)
     inference_interval = 1.0 / inference_fps
     last_inference_time = 0
     frame_idx = 0
+    reconnect_delay = initial_reconnect_delay
 
-    try:
-        while not stop_event.is_set():
-            ret, frame = cap.read()
+    while not stop_event.is_set():
+        cap = _open_capture(camera_name=camera_name, camera_url=camera_url)
 
-            if not ret or frame is None:
-                logger.warning("Failed to grab frame for camera %s", camera_name)
-                break
+        if cap is None:
+            logger.warning(
+                "Retrying connection for %s in %.1f seconds.",
+                camera_name,
+                reconnect_delay,
+            )
+            stop_event.wait(reconnect_delay)
+            reconnect_delay = min(reconnect_delay * 2, max_reconnect_delay)
+            continue
 
-            frame_idx += 1
-            now = time.time()
+        reconnect_delay = initial_reconnect_delay
 
-            if now - last_inference_time < inference_interval:
-                continue
+        try:
+            while not stop_event.is_set():
+                ret, frame = cap.read()
 
-            frame = cv2.resize(frame, dims, interpolation=cv2.INTER_LINEAR)
+                if not ret or frame is None:
+                    logger.warning(
+                        "Failed to grab frame for camera %s. Reconnecting...",
+                        camera_name,
+                    )
+                    break
 
-            frame_packet = FramePacket(
-                camera_name=camera_name,
-                timestamp=now,
-                frame_index=frame_idx,
-                frame=frame,
+                frame_idx += 1
+                now = time.time()
+
+                if now - last_inference_time < inference_interval:
+                    continue
+
+                frame = cv2.resize(frame, dims, interpolation=cv2.INTER_LINEAR)
+
+                frame_packet = FramePacket(
+                    camera_name=camera_name,
+                    timestamp=now,
+                    frame_index=frame_idx,
+                    frame=frame,
+                )
+
+                frame_queue.put_nowait(frame_packet)
+                last_inference_time = now
+
+        except Exception:
+            logger.exception(
+                "Unexpected error in camera worker for %s. Reconnecting...", camera_name
             )
 
-            frame_queue.put_nowait(frame_packet)
-            last_inference_time = now
+        finally:
+            logger.info("Releasing stream for %s", camera_name)
+            cap.release()
 
-    except Exception:
-        logger.exception("Camera worker crashed for %s", camera_name)
+        if not stop_event.is_set():
+            logger.info(
+                "Camera %s reconnecting in %.1f seconds.", camera_name, reconnect_delay
+            )
+            stop_event.wait(reconnect_delay)
+            reconnect_delay = min(reconnect_delay * 2, max_reconnect_delay)
 
-    finally:
-        logger.info("Releasing stream for %s", camera_name)
-        cap.release()
+    logger.info("Camera worker stopped for %s", camera_name)

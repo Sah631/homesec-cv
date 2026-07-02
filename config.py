@@ -48,13 +48,21 @@ SAVE_COOLDOWN = (
     1  # seconds between saving images of the same class from the same camera
 )
 
+# Clip General
 SAVE_CLIPS_ENABLED = True
-CLIP_PRE_ROLL_SECONDS = 15
-CLIP_POST_ROLL_SECONDS = 15
-CLIP_COOLDOWN_SECONDS = 5
+
+# Clip Timings
+CLIP_PRE_ROLL_SECONDS = 10
+CLIP_POST_ROLL_SECONDS = 5
+CLIP_COOLDOWN_SECONDS = 2
+CLIP_MAX_DURATION_SECONDS = 60
+
+# Clip Info
 CLIP_OUTPUT_FPS = 20.0
 CLIP_OUTPUT_MODE = "annotated"
 CLIP_LOCATION_MODE = "outside_ignore_zones"
+
+# Clip Paths
 CLIP_OUTPUT_DIR = Path("data/clips")
 CLIP_METADATA_PATH = Path("data/metadata/clips.jsonl")
 

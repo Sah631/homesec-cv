@@ -8,6 +8,7 @@ from config import CLIP_OUTPUT_FPS, DEFAULT_DIMENSIONS
 
 # from video.frame_buffer import FrameBuffer
 from schemas.packets import FramePacket
+from utils.clips import FrameBuffer
 from utils.queues import SlidingQueue
 
 logger = logging.getLogger(__name__)
@@ -24,12 +25,13 @@ def _open_capture(camera_name: str, camera_url: str) -> cv2.VideoCapture | None:
     logger.info("Opened stream for %s", camera_name)
     return cap
 
-
+# TODO: Test stream fps and optimise this worker to improve throughput
 def camera_worker(
     camera_name: str,
     camera_url: str,
     stop_event: threading.Event,
     frame_queue: SlidingQueue,
+    frame_buffer: FrameBuffer,
     inference_fps: float = CLIP_OUTPUT_FPS,
     dims: tuple[int, int] = DEFAULT_DIMENSIONS,
     initial_reconnect_delay: float = 1.0,
@@ -85,6 +87,8 @@ def camera_worker(
                     continue
 
                 frame = cv2.resize(frame, dims, interpolation=cv2.INTER_LINEAR)
+
+                frame_buffer.add_frame(frame=frame, timestamp=now)
 
                 frame_packet = FramePacket(
                     camera_name=camera_name,

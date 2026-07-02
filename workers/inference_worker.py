@@ -1,7 +1,7 @@
 import logging
 import threading
 import time
-from queue import Empty
+from queue import Empty, Full, Queue
 
 from config import DETECTION_CLASSES
 from schemas.packets import DetectionPacket
@@ -15,7 +15,7 @@ def inference_worker(
     detector,
     frame_queues: dict[str, SlidingQueue],
     display_queues: dict[str, SlidingQueue],
-    # detection_queue: SlidingQueue,
+    detection_queue: Queue,
     stop_event: threading.Event,
     idle_sleep_seconds: float = 0.01,
     error_sleep_seconds: float = 0.1,
@@ -85,7 +85,7 @@ def inference_worker(
         per_frame_latency_ms = batch_latency_ms / max(len(frame_packets), 1)
 
         for frame_packet, result in zip(frame_packets, latest_results):
-            detections = convert_yolo_to_detection(result)
+            detections, interesting_dets = convert_yolo_to_detection(frame_packet.camera_name, result)
 
             detection_packet = DetectionPacket(
                 frame_packet=frame_packet,
@@ -93,8 +93,18 @@ def inference_worker(
                 inference_timestamp=inference_end_time,
                 inference_latency_ms=per_frame_latency_ms,
                 model_name=detector.get_model_name(),
+                interesting_detections=interesting_dets,
             )
 
             display_queues[frame_packet.camera_name].put_nowait(detection_packet)
+            # Regular put, so if queue is full it will block. Test to see if queue is filling up regularly, and if yes then will need to change this
+            # so it doesn't interfere with the real-time detection pipeline
+            try:
+                detection_queue.put_nowait(detection_packet)
+            except Full:
+                logger.warning(
+                    "Detection queue full. Dropping clip packet for %s",
+                    frame_packet.camera_name,
+                )
 
     logger.info("Inference worker stopped.")

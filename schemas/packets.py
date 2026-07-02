@@ -34,6 +34,14 @@ class Detection:
     confidence: float
     xyxy: tuple[float, float, float, float]
 
+    def to_dict(self) -> dict:
+        return {
+            "class_id": self.class_id,
+            "class_name": self.class_name,
+            "confidence": self.confidence,
+            "bbox": list(self.xyxy),
+        }
+
 
 @dataclass(slots=True)
 class DetectionPacket:
@@ -41,6 +49,7 @@ class DetectionPacket:
 
     frame_packet: FramePacket
     detections: list[Detection]
+    interesting_detections: list[Detection]
     inference_timestamp: float
     inference_latency_ms: float
     model_name: str

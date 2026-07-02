@@ -1,11 +1,13 @@
 # Owns queue creation, main process execution, and ending/closing all threads
 import logging
+from queue import Queue
 from threading import Event, Thread
 
 from config import CAMERA_URLS
 from detectors.yolo26 import YOLODetector
+from utils.clips import ClipManager, FrameBuffer
 from utils.queues import SlidingQueue
-from workers import camera_worker, display_worker, inference_worker
+from workers import camera_worker, clip_worker, display_worker, inference_worker
 
 logger = logging.getLogger(__name__)
 
@@ -19,11 +21,13 @@ def main_worker():
     watches for unexpected worker exits, and joins threads during shutdown.
     """
     frame_queues: dict[str, SlidingQueue] = {}
-    # detection_queue = SlidingQueue(maxsize=10)
+    frame_buffers: dict[str, FrameBuffer] = {}
     display_queues: dict[str, SlidingQueue] = {}
     camera_threads: dict[str, Thread] = {}
     stop_event = Event()
     detector = YOLODetector(model_name="YOLO26")
+    clip_manager: ClipManager = ClipManager()
+    detection_queue: Queue = Queue(maxsize=250)
     camera_names = list(CAMERA_URLS.keys())
 
     for camera_name, camera_url in CAMERA_URLS.items():
@@ -32,6 +36,8 @@ def main_worker():
         )  # Should make this a constant
 
         display_queues[camera_name] = SlidingQueue(maxsize=1)
+
+        frame_buffers[camera_name] = FrameBuffer()
 
         camera_threads[camera_name] = Thread(
             target=camera_worker,
@@ -43,6 +49,7 @@ def main_worker():
                 "frame_queue": frame_queues[
                     camera_name
                 ],  # Add fps and dims as kwargs later
+                "frame_buffer": frame_buffers[camera_name],
             },
         )
 
@@ -53,6 +60,7 @@ def main_worker():
             "detector": detector,
             "frame_queues": frame_queues,
             "display_queues": display_queues,
+            "detection_queue": detection_queue,
             "stop_event": stop_event,
         },
     )
@@ -67,10 +75,22 @@ def main_worker():
         },
     )
 
+    clip_thread = Thread(
+        target=clip_worker,
+        name="ClipWorker",
+        kwargs={
+            "stop_event": stop_event,
+            "detection_queue": detection_queue,
+            "clip_manager": clip_manager,
+            "frame_buffers": frame_buffers,
+        },
+    )
+
     all_threads = [
         *camera_threads.values(),
         inference_thread,
         display_thread,
+        clip_thread,
     ]
 
     try:

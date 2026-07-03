@@ -85,6 +85,7 @@ def inference_worker(
         per_frame_latency_ms = batch_latency_ms / max(len(frame_packets), 1)
 
         for frame_packet, result in zip(frame_packets, latest_results):
+            # TODO: Add a variable for toggling ignore zones
             detections, interesting_dets = convert_yolo_to_detection(frame_packet.camera_name, result)
 
             detection_packet = DetectionPacket(
@@ -97,8 +98,7 @@ def inference_worker(
             )
 
             display_queues[frame_packet.camera_name].put_nowait(detection_packet)
-            # Regular put, so if queue is full it will block. Test to see if queue is filling up regularly, and if yes then will need to change this
-            # so it doesn't interfere with the real-time detection pipeline
+
             try:
                 detection_queue.put_nowait(detection_packet)
             except Full:

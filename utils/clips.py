@@ -70,6 +70,7 @@ class ClipEvent:
     trigger_detections: list[
         dict
     ]  # This is for metadata - stores info about detections. Should have the format: [{"class_id": int, "class_name": str, "confidence": float, "bbox": [x1, y1, x2, y2]}, ...]
+    clip_fps: float
 
 
 class ClipManager:
@@ -130,8 +131,21 @@ class ClipManager:
         detections: list[Detection],
     ):
         """Start a new clip for the given camera by appending pre-roll frames from the buffer and initialising a ClipEvent"""
-        logger.info("Starting clip with %d pre-roll frames", len(pre_roll_entries))
         start_time = pre_roll_entries[0][0] if pre_roll_entries else detection_time
+
+        if len(pre_roll_entries) >= 2:
+            first_ts = pre_roll_entries[0][0]
+            last_ts = pre_roll_entries[-1][0]
+            pre_roll_time = max(last_ts - first_ts, 1.0)
+            clip_fps = max((len(pre_roll_entries) - 1) / pre_roll_time, 5.0)
+        else:
+            clip_fps = CLIP_OUTPUT_FPS
+        
+        clip_fps = min(max(clip_fps, 5.0), CLIP_OUTPUT_FPS)
+
+        logger.info("Starting clip with %d pre-roll frames, at %.1f fps", len(pre_roll_entries), clip_fps)
+        
+
         clip_path = self._generate_clip_path(camera, start_time)
 
         Path(clip_path).parent.mkdir(parents=True, exist_ok=True)
@@ -139,7 +153,7 @@ class ClipManager:
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
 
         # TODO: Add variable for writer dimensions
-        writer = cv2.VideoWriter(clip_path, fourcc, CLIP_OUTPUT_FPS, (1280, 720))
+        writer = cv2.VideoWriter(clip_path, fourcc, clip_fps, (1280, 720))
 
         # TODO: Add retry logic OR consider if its necessary. Keep latency in mind
         if not writer.isOpened():
@@ -161,6 +175,7 @@ class ClipManager:
             start_time=start_time,
             last_detection_time=detection_time,
             trigger_detections=[d.to_dict() for d in detections],
+            clip_fps=clip_fps
         )
 
         self.active_clips[camera] = clip_event
@@ -173,12 +188,12 @@ class ClipManager:
             try:
                 event.writer.release()
                 self.last_clip_end_times[camera] = time.time()
-                clip_path, detections = event.clip_path, event.trigger_detections
+                clip_path, detections, clip_fps = event.clip_path, event.trigger_detections, event.clip_fps
 
                 start_time = self._format_timestamp(event.start_time)
                 end_time = self._format_timestamp(time.time())
 
-                self._save_clip_metadata(clip_path, detections, start_time, end_time)
+                self._save_clip_metadata(clip_path, detections, start_time, end_time, clip_fps)
 
                 logger.info(
                     "Clip saved to %s with %d trigger detections",
@@ -198,6 +213,7 @@ class ClipManager:
         detections: list | None,
         start_time: float | None = None,
         end_time: float | None = None,
+        clip_fps: float | None = None,
     ):
         """Save metadata about the clip and its trigger detections to a JSONL file for later analysis"""
         if detections is None:
@@ -208,7 +224,7 @@ class ClipManager:
             "detections": detections,
             "start_time": start_time,
             "end_time": end_time,
-            "fps": CLIP_OUTPUT_FPS,
+            "fps": clip_fps,
             "output_mode": CLIP_OUTPUT_MODE,
         }
 

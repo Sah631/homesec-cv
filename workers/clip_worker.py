@@ -50,13 +50,8 @@ def clip_worker(
             logger.error("Detection packet malformed. Skipping for clip saving")
             continue
 
-        # Ensure clip manager logic is as expected. It should not write to file, it should return a clipwriter object if clip has ended
-        # If it returns, then I will wrap it in a ClipPacket (or FilePacket), and add it to the file_queue (or clip_queue) to be processed
-        # and saved by another worker
         clip_manager.process_frame(
-            camera=detection_packet.camera_name,
-            frame=detection_packet.frame,
+            detection_packet=detection_packet,
             frame_buffer=frame_buffers[detection_packet.camera_name],
-            detections=detection_packet.interesting_detections,
         )
     pass

@@ -5,7 +5,9 @@ from queue import Empty, Full, Queue
 
 from config import DETECTION_CLASSES
 from schemas.packets import DetectionPacket
+from utils.clips import FrameBuffer
 from utils.detection import convert_yolo_to_detection
+from utils.display import annotate_frame
 from utils.queues import SlidingQueue
 
 logger = logging.getLogger(__name__)
@@ -15,6 +17,7 @@ def inference_worker(
     detector,
     frame_queues: dict[str, SlidingQueue],
     display_queues: dict[str, SlidingQueue],
+    frame_buffers: dict[str, FrameBuffer],
     detection_queue: Queue,
     stop_event: threading.Event,
     idle_sleep_seconds: float = 0.01,
@@ -96,6 +99,11 @@ def inference_worker(
                 model_name=detector.get_model_name(),
                 interesting_detections=interesting_dets,
             )
+
+            # TODO: Add toggle for whether clips should be annotated or raw
+            annotated_frame = annotate_frame(detection_packet)
+
+            frame_buffers[frame_packet.camera_name].add_frame(annotated_frame, frame_packet.timestamp)
 
             display_queues[frame_packet.camera_name].put_nowait(detection_packet)
 

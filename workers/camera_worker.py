@@ -88,7 +88,8 @@ def camera_worker(
 
                 frame = cv2.resize(frame, dims, interpolation=cv2.INTER_LINEAR)
 
-                frame_buffer.add_frame(frame=frame, timestamp=now)
+                # TODO: Remove frame buffer from here and let inference worker own frame buffer so that initial part of clips can have annotations
+                # frame_buffer.add_frame(frame=frame, timestamp=now)
 
                 frame_packet = FramePacket(
                     camera_name=camera_name,

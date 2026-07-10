@@ -60,6 +60,7 @@ def main_worker():
             "detector": detector,
             "frame_queues": frame_queues,
             "display_queues": display_queues,
+            "frame_buffers": frame_buffers,
             "detection_queue": detection_queue,
             "stop_event": stop_event,
         },

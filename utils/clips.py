@@ -18,7 +18,8 @@ from config import (
     CLIP_POST_ROLL_SECONDS,
     CLIP_PRE_ROLL_SECONDS,
 )
-from schemas.packets import Detection
+from schemas.packets import Detection, DetectionPacket
+from utils.display import annotate_frame
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +73,7 @@ class ClipEvent:
     ]  # This is for metadata - stores info about detections. Should have the format: [{"class_id": int, "class_name": str, "confidence": float, "bbox": [x1, y1, x2, y2]}, ...]
     clip_fps: float
 
-
+# TODO: Add annotated parameter and annotate frame using annotate_frame util function if True
 class ClipManager:
     def __init__(
         self,
@@ -86,10 +87,19 @@ class ClipManager:
         self.max_duration_seconds = max_duration_seconds
         self.last_clip_end_times: dict[str, float] = {}
 
+    # TODO: Refactor this function to just use DetectionPacket and FrameBuffer
     def process_frame(
-        self, camera: str, frame, frame_buffer: FrameBuffer, detections: list | None
+        self, detection_packet: DetectionPacket, frame_buffer: FrameBuffer
     ):
         """Main method to be called for each frame. Manages starting new clips based on detections, appending frames to active clips, and ending clips after post-roll period has passed without new detections."""
+        camera, detections = detection_packet.camera_name, detection_packet.interesting_detections
+
+        if camera is None:
+            logger.error("No camera name found in detection packet. Skipping...")
+            return
+        
+        frame = annotate_frame(detection_packet)
+        
         event = self.active_clips.get(camera)
 
         now = time.time()

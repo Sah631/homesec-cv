@@ -73,6 +73,7 @@ class ClipEvent:
     ]  # This is for metadata - stores info about detections. Should have the format: [{"class_id": int, "class_name": str, "confidence": float, "bbox": [x1, y1, x2, y2]}, ...]
     clip_fps: float
 
+
 # TODO: Add annotated parameter and annotate frame using annotate_frame util function if True
 class ClipManager:
     def __init__(
@@ -92,14 +93,17 @@ class ClipManager:
         self, detection_packet: DetectionPacket, frame_buffer: FrameBuffer
     ):
         """Main method to be called for each frame. Manages starting new clips based on detections, appending frames to active clips, and ending clips after post-roll period has passed without new detections."""
-        camera, detections = detection_packet.camera_name, detection_packet.interesting_detections
+        camera, detections = (
+            detection_packet.camera_name,
+            detection_packet.interesting_detections,
+        )
 
         if camera is None:
             logger.error("No camera name found in detection packet. Skipping...")
             return
-        
+
         frame = annotate_frame(detection_packet)
-        
+
         event = self.active_clips.get(camera)
 
         now = time.time()
@@ -150,11 +154,14 @@ class ClipManager:
             clip_fps = max((len(pre_roll_entries) - 1) / pre_roll_time, 5.0)
         else:
             clip_fps = CLIP_OUTPUT_FPS
-        
+
         clip_fps = min(max(clip_fps, 5.0), CLIP_OUTPUT_FPS)
 
-        logger.info("Starting clip with %d pre-roll frames, at %.1f fps", len(pre_roll_entries), clip_fps)
-        
+        logger.info(
+            "Starting clip with %d pre-roll frames, at %.1f fps",
+            len(pre_roll_entries),
+            clip_fps,
+        )
 
         clip_path = self._generate_clip_path(camera, start_time)
 
@@ -185,7 +192,7 @@ class ClipManager:
             start_time=start_time,
             last_detection_time=detection_time,
             trigger_detections=[d.to_dict() for d in detections],
-            clip_fps=clip_fps
+            clip_fps=clip_fps,
         )
 
         self.active_clips[camera] = clip_event
@@ -198,12 +205,18 @@ class ClipManager:
             try:
                 event.writer.release()
                 self.last_clip_end_times[camera] = time.time()
-                clip_path, detections, clip_fps = event.clip_path, event.trigger_detections, event.clip_fps
+                clip_path, detections, clip_fps = (
+                    event.clip_path,
+                    event.trigger_detections,
+                    event.clip_fps,
+                )
 
                 start_time = self._format_timestamp(event.start_time)
                 end_time = self._format_timestamp(time.time())
 
-                self._save_clip_metadata(clip_path, detections, start_time, end_time, clip_fps)
+                self._save_clip_metadata(
+                    clip_path, detections, start_time, end_time, clip_fps
+                )
 
                 logger.info(
                     "Clip saved to %s with %d trigger detections",

@@ -18,6 +18,7 @@ def inference_worker(
     frame_queues: dict[str, SlidingQueue],
     display_queues: dict[str, SlidingQueue],
     frame_buffers: dict[str, FrameBuffer],
+    latest_annotated_frames: dict[str, SlidingQueue],
     detection_queue: Queue,
     stop_event: threading.Event,
     idle_sleep_seconds: float = 0.01,
@@ -89,7 +90,9 @@ def inference_worker(
 
         for frame_packet, result in zip(frame_packets, latest_results):
             # TODO: Add a variable for toggling ignore zones
-            detections, interesting_dets = convert_yolo_to_detection(frame_packet.camera_name, result)
+            detections, interesting_dets = convert_yolo_to_detection(
+                frame_packet.camera_name, result
+            )
 
             detection_packet = DetectionPacket(
                 frame_packet=frame_packet,
@@ -103,7 +106,13 @@ def inference_worker(
             # TODO: Add toggle for whether clips should be annotated or raw
             annotated_frame = annotate_frame(detection_packet)
 
-            frame_buffers[frame_packet.camera_name].add_frame(annotated_frame, frame_packet.timestamp)
+            frame_buffers[frame_packet.camera_name].add_frame(
+                annotated_frame, frame_packet.timestamp
+            )
+
+            latest_annotated_frames[frame_packet.camera_name].put_nowait(
+                annotated_frame
+            )
 
             display_queues[frame_packet.camera_name].put_nowait(detection_packet)
 

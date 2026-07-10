@@ -4,6 +4,7 @@ from schemas.packets import DetectionPacket
 
 
 def annotate_frame(detection_packet: DetectionPacket):
+    """Returns an annotated frame based on the detections in detection_packet"""
     annotated_frame = detection_packet.frame.copy()
 
     if detection_packet is None:

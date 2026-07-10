@@ -29,7 +29,9 @@ def is_detection_ignored(camera_name: str, detection: Detection) -> bool:
     return False
 
 
-def convert_yolo_to_detection(camera_name, result) -> tuple[list[Detection], list[Detection]]:
+def convert_yolo_to_detection(
+    camera_name, result
+) -> tuple[list[Detection], list[Detection]]:
     detections: list[Detection] = []
     interesting_detections: list[Detection] = []
 
@@ -43,12 +45,12 @@ def convert_yolo_to_detection(camera_name, result) -> tuple[list[Detection], lis
         confidence = float(box.conf[0])
 
         detection = Detection(
-                class_id=class_id,
-                class_name=class_name,
-                confidence=confidence,
-                xyxy=(x1, y1, x2, y2),
-            )
-        
+            class_id=class_id,
+            class_name=class_name,
+            confidence=confidence,
+            xyxy=(x1, y1, x2, y2),
+        )
+
         if not is_detection_ignored(camera_name=camera_name, detection=detection):
             interesting_detections.append(detection)
 

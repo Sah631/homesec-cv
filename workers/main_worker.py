@@ -7,7 +7,13 @@ from config import CAMERA_URLS
 from detectors.yolo26 import YOLODetector
 from utils.clips import ClipManager, FrameBuffer
 from utils.queues import SlidingQueue
-from workers import camera_worker, clip_worker, display_worker, inference_worker
+from workers import (
+    camera_worker,
+    clip_worker,
+    display_worker,
+    inference_worker,
+    rtsp_worker,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +30,7 @@ def main_worker():
     frame_buffers: dict[str, FrameBuffer] = {}
     display_queues: dict[str, SlidingQueue] = {}
     camera_threads: dict[str, Thread] = {}
+    latest_annotated_frames: dict[str, SlidingQueue] = {}
     stop_event = Event()
     detector = YOLODetector(model_name="YOLO26")
     clip_manager: ClipManager = ClipManager()
@@ -37,6 +44,8 @@ def main_worker():
 
         display_queues[camera_name] = SlidingQueue(maxsize=1)
 
+        latest_annotated_frames[camera_name] = SlidingQueue(maxsize=1)
+
         frame_buffers[camera_name] = FrameBuffer()
 
         camera_threads[camera_name] = Thread(
@@ -49,7 +58,6 @@ def main_worker():
                 "frame_queue": frame_queues[
                     camera_name
                 ],  # Add fps and dims as kwargs later
-                "frame_buffer": frame_buffers[camera_name],
             },
         )
 
@@ -61,6 +69,7 @@ def main_worker():
             "frame_queues": frame_queues,
             "display_queues": display_queues,
             "frame_buffers": frame_buffers,
+            "latest_annotated_frames": latest_annotated_frames,
             "detection_queue": detection_queue,
             "stop_event": stop_event,
         },
@@ -87,11 +96,22 @@ def main_worker():
         },
     )
 
+    # Add fps as a configurable arg later
+    rtsp_thread = Thread(
+        target=rtsp_worker,
+        name="RTSPWorker",
+        kwargs={
+            "latest_annotated_frames": latest_annotated_frames,
+            "stop_event": stop_event,
+        },
+    )
+
     all_threads = [
         *camera_threads.values(),
         inference_thread,
         display_thread,
         clip_thread,
+        rtsp_thread,
     ]
 
     try:

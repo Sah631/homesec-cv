@@ -1,7 +1,6 @@
 from queue import Queue
 
 
-# TODO: Fix this queue class to ensure it is thread-safe and optimised
 class SlidingQueue(Queue):
     """
     Fixed-size queue where put() drops the oldest item when full.

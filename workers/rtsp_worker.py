@@ -128,6 +128,8 @@ def rtsp_worker(
 
                 frames[i] = frame
 
+            # TODO: Maybe remove this, so if one camera is lagging, the display keeps updating for the other cameras
+            # and reuses the old frame for the 'stuck' camera
             if not all(frame is not None for frame in frames):
                 stop_event.wait(0.01)
                 continue

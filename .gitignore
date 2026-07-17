@@ -221,3 +221,8 @@ __pycache__
 checkpoints/*
 .vscode/*
 data/*
+
+frames/*
+
+apps/python-opencv/data/*
+apps/python-opencv/checkpoints/*
